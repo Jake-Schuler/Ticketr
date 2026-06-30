@@ -25,6 +25,9 @@ func init() {
 	if os.Getenv("Support_Topic_ID") == "" {
 		log.Fatal("Support_Topic_ID environment variable is required.")
 	}
+	if os.Getenv("Archive_Topic_ID") == "" {
+		log.Fatal("Archive_Topic_ID environment variable is required.")
+	}
 }
 
 var s *discordgo.Session
@@ -85,6 +88,10 @@ var (
 				},
 			},
 		},
+		{
+			Name:        "delete",
+			Description: "Delete the ticket (staff only)",
+		},
 	}
 	commandHandlers = map[string]func(s *discordgo.Session, m *discordgo.InteractionCreate){
 		"open": func(s *discordgo.Session, m *discordgo.InteractionCreate) {
@@ -112,6 +119,9 @@ var (
 				user = m.ApplicationCommandData().Options[0].UserValue(s)
 			}
 			removeCommand(s, m, user)
+		},
+		"delete": func(s *discordgo.Session, m *discordgo.InteractionCreate) {
+			deleteCommand(s, m)
 		},
 	}
 )
@@ -181,7 +191,7 @@ func ephemeral(m *discordgo.InteractionCreate, text string) {
 }
 
 func closeCommand(s *discordgo.Session, m *discordgo.InteractionCreate) {
-	channel, err := s.State.Channel(m.ChannelID)
+	channel, err := s.Channel(m.ChannelID)
 	if err != nil {
 		ephemeral(m, "Failed to fetch the channel.")
 		return
@@ -190,10 +200,56 @@ func closeCommand(s *discordgo.Session, m *discordgo.InteractionCreate) {
 		ephemeral(m, "This command can only be used in a ticket channel.")
 		return
 	}
+	archiveTopicID := os.Getenv("Archive_Topic_ID")
+	permissionOverwrites := make([]*discordgo.PermissionOverwrite, 0, len(channel.PermissionOverwrites))
+	for _, overwrite := range channel.PermissionOverwrites {
+		if overwrite.Type == discordgo.PermissionOverwriteTypeRole {
+			permissionOverwrites = append(permissionOverwrites, overwrite)
+		}
+	}
+	_, err = s.ChannelEditComplex(channel.ID, &discordgo.ChannelEdit{
+		ParentID:             archiveTopicID,
+		PermissionOverwrites: permissionOverwrites,
+	})
+	if err != nil {
+		ephemeral(m, "Failed to archive the ticket.")
+		return
+	}
+	ephemeral(m, "Ticket archived.")
+}
+
+func deleteCommand(s *discordgo.Session, m *discordgo.InteractionCreate) {
+	channel, err := s.Channel(m.ChannelID)
+	if err != nil {
+		ephemeral(m, "Failed to fetch the channel.")
+		return
+	}
+	if channel.ParentID != os.Getenv("Support_Topic_ID") && channel.ParentID != os.Getenv("Archive_Topic_ID") {
+		ephemeral(m, "This command can only be used in a ticket channel.")
+		return
+	}
+	member, err := s.GuildMember(os.Getenv("Guild_ID"), m.Member.User.ID)
+	if err != nil {
+		ephemeral(m, "Failed to fetch user information.")
+		return
+	}
+	hasRole := false
+	for _, role := range member.Roles {
+		if role == os.Getenv("Support_Role_ID") {
+			hasRole = true
+			break
+		}
+	}
+	if !hasRole {
+		ephemeral(m, "You do not have permission to delete tickets.")
+		return
+	}
 	_, err = s.ChannelDelete(channel.ID)
 	if err != nil {
-		panic(err)
+		ephemeral(m, "Failed to delete the ticket.")
+		return
 	}
+	ephemeral(m, "Ticket deleted.")
 }
 
 func addCommand(s *discordgo.Session, m *discordgo.InteractionCreate, user *discordgo.User) {
@@ -213,6 +269,7 @@ func addCommand(s *discordgo.Session, m *discordgo.InteractionCreate, user *disc
 		return
 	}
 	ephemeral(m, "User added to ticket.")
+	s.ChannelMessageSend(channel.ID, user.Mention()+" has been added to the ticket.")
 }
 
 func removeCommand(s *discordgo.Session, m *discordgo.InteractionCreate, user *discordgo.User) {
@@ -256,6 +313,7 @@ func removeCommand(s *discordgo.Session, m *discordgo.InteractionCreate, user *d
 		return
 	}
 	ephemeral(m, "User removed from ticket.")
+	s.ChannelMessageSend(channel.ID, user.Mention()+" has been removed from the ticket.")
 }
 
 func init() {
@@ -284,6 +342,8 @@ func main() {
 		}
 		registeredCommands[i] = cmd
 	}
+
+	s.UpdateCustomStatus("/open to contact admin")
 
 	defer s.Close()
 
