@@ -169,7 +169,11 @@ func openCommand(s *discordgo.Session, m *discordgo.InteractionCreate, user *dis
 		}
 	}
 
-	s.ChannelMessageSend(channel.ID, "Hello "+user.Mention()+", welcome to your ticket! Please describe your issue and a staff member will assist you shortly.")
+	if user.ID != m.Member.User.ID {
+		s.ChannelMessageSend(channel.ID, "Hello "+user.Mention()+", a staff member has opened a ticket for you.")
+	} else {
+		s.ChannelMessageSend(channel.ID, "Hello "+user.Mention()+", welcome to your ticket! Please describe your issue and a staff member will assist you shortly.")
+	}
 
 	s.InteractionRespond(m.Interaction, &discordgo.InteractionResponse{
 		Type: discordgo.InteractionResponseChannelMessageWithSource,
