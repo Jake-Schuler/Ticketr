@@ -158,6 +158,7 @@ func openCommand(s *discordgo.Session, m *discordgo.InteractionCreate, user *dis
 		discordgo.PermissionViewChannel|discordgo.PermissionSendMessages|discordgo.PermissionReadMessageHistory, 0)
 	if err != nil {
 		ephemeral(m, "Failed to add user to ticket")
+		log.Printf("Error adding user to ticket: %v", err)
 		return
 	}
 
@@ -217,6 +218,7 @@ func closeCommand(s *discordgo.Session, m *discordgo.InteractionCreate) {
 	})
 	if err != nil {
 		ephemeral(m, "Failed to archive the ticket.")
+		log.Printf("Error archiving ticket: %v", err)
 		return
 	}
 	ephemeral(m, "Ticket archived.")
@@ -250,6 +252,7 @@ func deleteCommand(s *discordgo.Session, m *discordgo.InteractionCreate) {
 	}
 	_, err = s.ChannelDelete(channel.ID)
 	if err != nil {
+		log.Printf("Error deleting ticket: %v", err)
 		ephemeral(m, "Failed to delete the ticket.")
 		return
 	}
@@ -269,6 +272,7 @@ func addCommand(s *discordgo.Session, m *discordgo.InteractionCreate, user *disc
 	err = s.ChannelPermissionSet(channel.ID, user.ID, discordgo.PermissionOverwriteTypeMember,
 		discordgo.PermissionViewChannel|discordgo.PermissionSendMessages|discordgo.PermissionReadMessageHistory, 0)
 	if err != nil {
+		log.Printf("Error adding user to ticket: %v", err)
 		ephemeral(m, "Failed to add user to ticket.")
 		return
 	}
@@ -313,6 +317,7 @@ func removeCommand(s *discordgo.Session, m *discordgo.InteractionCreate, user *d
 	err = s.ChannelPermissionSet(channel.ID, user.ID, discordgo.PermissionOverwriteTypeMember, 0,
 		discordgo.PermissionViewChannel|discordgo.PermissionSendMessages|discordgo.PermissionReadMessageHistory)
 	if err != nil {
+		log.Printf("Error removing user from ticket: %v", err)
 		ephemeral(m, "Failed to remove user from ticket.")
 		return
 	}
